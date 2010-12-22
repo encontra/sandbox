@@ -190,11 +190,15 @@ public class DemoTest extends TestCase {
 
             System.out.println("Creating a knn query...");
             BufferedImage image = ImageIO.read(new File("C:\\Users\\Ricardo\\Desktop\\testcases\\28\\28004.jpg"));
+            BufferedImage image2 = ImageIO.read(new File("C:\\Users\\Ricardo\\Desktop\\testcases\\28\\28025.jpg"));
 
             CriteriaBuilderImpl cb = new CriteriaBuilderImpl();
             CriteriaQuery<ImageModel> query = cb.createQuery(ImageModel.class);
             Path imagePath = query.from(ImageModel.class).get("image");
-            query = query.where(cb.similar(imagePath, image));
+            query = query.where(
+                    cb.or(
+                        cb.similar(imagePath, image),
+                        cb.similar(imagePath, image2)));
 
             ResultSet<ImageModel> results = e.search(query);
 
@@ -207,6 +211,7 @@ public class DemoTest extends TestCase {
                 System.out.print("Retrieved element: " + r.getResult().toString() + "\t");
                 System.out.println("Similarity: " + r.getSimilarity());
             }
+
         } catch (IOException ex) {
             System.out.println("[Error] Couldn't load the query image. Possible reason: " + ex.getMessage());
         }
