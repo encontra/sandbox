@@ -9,6 +9,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import javax.imageio.ImageIO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import pt.inevo.encontra.demo.utils.FileUtil;
 
 /**
@@ -22,11 +24,14 @@ public class ImageModelLoader {
     protected List<File> imagesFiles;
     protected Iterator<File> it;
     protected HashMap<String, String> annotations = new HashMap<String, String>();
+    protected Logger logger;
 
     public ImageModelLoader() {
+        logger = LoggerFactory.getLogger(ImageModelLoader.class);
     }
 
     public ImageModelLoader(String imagesPath) {
+        this();
         this.imagesPath = imagesPath;
     }
 
@@ -45,8 +50,7 @@ public class ImageModelLoader {
             BufferedImage bufImg = ImageIO.read(image);
             im.setImage(bufImg);
         } catch (IOException ex) {
-            System.out.println("Error: ");
-            //skip this image because i just can't read it
+            logger.error("Couldn't load the picture: " + image.getName());
             return null;
         }
 
@@ -74,7 +78,7 @@ public class ImageModelLoader {
                 }
             }
         } catch (IOException ex) {
-            System.out.println("Could not read the annotations");
+            logger.error("Couldn't load the annotations for the model.");
         }
     }
 
