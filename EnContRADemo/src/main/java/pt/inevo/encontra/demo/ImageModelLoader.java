@@ -35,7 +35,7 @@ public class ImageModelLoader {
         this.imagesPath = imagesPath;
     }
 
-    private ImageModel loadImage(File image) {
+    public ImageModel loadImage(File image) {
 
         //for now only sets the filename
         ImageModel im = new ImageModel(image.getAbsolutePath(), "", null);
@@ -86,7 +86,7 @@ public class ImageModelLoader {
         return it.hasNext();
     }
 
-    public ImageModel next() {
-        return loadImage(it.next());
+    public File next() {
+        return it.next();
     }
 }

@@ -12,6 +12,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.List;
 import java.util.Properties;
 import javax.imageio.ImageIO;
 import pt.inevo.encontra.descriptors.DescriptorExtractor;
@@ -76,20 +77,23 @@ public class DemoTest extends TestCase {
         System.out.println("Creating the Retrieval Engine...");
         e = new SimpleEngine<ImageModel>();
         e.setObjectStorage(storage);
-        e.setQueryProcessor(new QueryProcessorParallelImpl());
+        e.setQueryProcessor(new QueryProcessorParallelLinearImpl());
+//        e.setQueryProcessor(new QueryProcessorDefaultImpl());
         e.getQueryProcessor().setIndexedObjectFactory(new SimpleIndexedObjectFactory());
 
         //A searcher for the filenameIndex
         SimpleSearcher filenameSearcher = new SimpleSearcher();
         filenameSearcher.setDescriptorExtractor(stringDescriptorExtractor);
         filenameSearcher.setIndex(new BTreeIndex("filenameSearcher", StringDescriptor.class));
-        filenameSearcher.setQueryProcessor(new QueryProcessorParallelImpl());
+        filenameSearcher.setQueryProcessor(new QueryProcessorParallelLinearImpl());
+//        filenameSearcher.setQueryProcessor(new QueryProcessorDefaultImpl());
 
         //A searcher for the descriptionIndex
         SimpleSearcher descriptionSearcher = new SimpleSearcher();
         descriptionSearcher.setDescriptorExtractor(stringDescriptorExtractor);
         descriptionSearcher.setIndex(new BTreeIndex("descriptionSearcher", StringDescriptor.class));
-        descriptionSearcher.setQueryProcessor(new QueryProcessorParallelImpl());
+        descriptionSearcher.setQueryProcessor(new QueryProcessorParallelLinearImpl());
+//        descriptionSearcher.setQueryProcessor(new QueryProcessorDefaultImpl());
 
         //A searcher for the image contentIndex (using only one type of descriptor
         NBTreeSearcher imageSearcher = new NBTreeSearcher();
@@ -97,7 +101,8 @@ public class DemoTest extends TestCase {
         imageSearcher.setDescriptorExtractor(new ColorLayoutDescriptor<IndexedObject>());
         //using a BTreeIndex
         imageSearcher.setIndex(new BTreeIndex("contentSearcher", ColorLayoutDescriptor.class));
-        imageSearcher.setQueryProcessor(new QueryProcessorParallelImpl());
+        imageSearcher.setQueryProcessor(new QueryProcessorParallelLinearImpl());
+//        imageSearcher.setQueryProcessor(new QueryProcessorDefaultImpl());
 
         e.getQueryProcessor().setSearcher("filename", filenameSearcher);
         e.getQueryProcessor().setSearcher("description", descriptionSearcher);
@@ -130,13 +135,18 @@ public class DemoTest extends TestCase {
 
     class ImageLoaderActor extends UntypedActor {
 
-        private ImageModelLoader loader;
-        private ArrayList<ActorRef> producers;
-        protected ActorRef originalActor;
+        protected ImageModelLoader loader;
+        protected  ArrayList<ActorRef> producers;
         protected CompletableFuture future;
+        protected List<Result> results;
 
         ImageLoaderActor() {
             producers = new ArrayList<ActorRef>();
+        }
+
+        ImageLoaderActor(ImageModelLoader loader) {
+            this();
+            this.loader = loader;
         }
 
         @Override
@@ -151,7 +161,7 @@ public class DemoTest extends TestCase {
 
                             @Override
                             public UntypedActor create() {
-                                return new ImageLoaderActor();
+                                return new ImageLoaderActor(loader);
                             }
                         }).start();
                         producers.add(actor);
@@ -159,8 +169,6 @@ public class DemoTest extends TestCase {
 
                     if (getContext().getSenderFuture().isDefined()) {
                         future = (CompletableFuture) getContext().getSenderFuture().get();
-                    } else if (getContext().getSender().isDefined()) {
-                        originalActor = (ActorRef) getContext().getSender().get();
                     }
 
                     for (ActorRef producer : producers) {
@@ -173,16 +181,21 @@ public class DemoTest extends TestCase {
                     }
 
                 } else if (message.operation.equals("PROCESSONE")) {
-                    ImageModel model = (ImageModel) message.obj;
-                    if (model != null) {
+                    File f = (File)message.obj;
+                    ImageModel model = loader.loadImage(f);
+                    
+                    Message answer = new Message();
+                    answer.operation = "ANSWER";
+                    answer.obj = model;
+                    getContext().replySafe(answer);
+                } else if (message.operation.equals("ANSWER")) {
+                    ImageModel model = (ImageModel)message.obj;
+                    if (model != null) {    //save the object
                         e.insert(model);
                         model.getImage().flush();
                         model.getImage().getGraphics().dispose();
                     }
-                    Message answer = new Message();
-                    answer.operation = "ANSWER";
-                    getContext().replySafe(answer);
-                } else if (message.operation.equals("ANSWER")) {
+
                     if (loader.hasNext()) {
                         Message m = new Message();
                         m.operation = "PROCESSONE";
@@ -193,9 +206,7 @@ public class DemoTest extends TestCase {
                         long freeMem = r.freeMemory();
                         System.out.println("Free memory was: " + freeMem);
 
-                        if (originalActor != null) {
-                            originalActor.sendOneWay(true);
-                        } else {
+                        if (future != null) {
                             future.completeWithResult(true);
                         }
                     }
@@ -252,7 +263,7 @@ public class DemoTest extends TestCase {
             CriteriaQuery<ImageModel> query = cb.createQuery(ImageModel.class);
             Path imagePath = query.from(ImageModel.class).get("image");
             query = query.where(
-                    cb.or(
+                    cb.and(
                         cb.similar(imagePath, image),
                         cb.similar(imagePath, image2))).distinct(true);
 
