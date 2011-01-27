@@ -19,6 +19,7 @@ import javax.imageio.ImageIO;
 import pt.inevo.encontra.descriptors.DescriptorExtractor;
 import pt.inevo.encontra.engine.SimpleEngine;
 import junit.framework.TestCase;
+import pt.inevo.encontra.common.ResultSet;
 import pt.inevo.encontra.descriptors.SimpleDescriptorExtractor;
 import pt.inevo.encontra.engine.SimpleIndexedObjectFactory;
 import pt.inevo.encontra.image.descriptors.ColorLayoutDescriptor;
@@ -78,23 +79,23 @@ public class DemoTest extends TestCase {
         System.out.println("Creating the Retrieval Engine...");
         e = new SimpleEngine<ImageModel>();
         e.setObjectStorage(storage);
-        e.setQueryProcessor(new QueryProcessorParallelLinearImpl());
-//        e.setQueryProcessor(new QueryProcessorDefaultImpl());
+//        e.setQueryProcessor(new QueryProcessorParallelLinearImpl());
+        e.setQueryProcessor(new QueryProcessorDefaultImpl());
         e.getQueryProcessor().setIndexedObjectFactory(new SimpleIndexedObjectFactory());
 
         //A searcher for the filenameIndex
         SimpleSearcher filenameSearcher = new SimpleSearcher();
         filenameSearcher.setDescriptorExtractor(stringDescriptorExtractor);
         filenameSearcher.setIndex(new BTreeIndex("filenameSearcher", StringDescriptor.class));
-        filenameSearcher.setQueryProcessor(new QueryProcessorParallelLinearImpl());
-//        filenameSearcher.setQueryProcessor(new QueryProcessorDefaultImpl());
+//        filenameSearcher.setQueryProcessor(new QueryProcessorParallelLinearImpl());
+        filenameSearcher.setQueryProcessor(new QueryProcessorDefaultImpl());
 
         //A searcher for the descriptionIndex
         SimpleSearcher descriptionSearcher = new SimpleSearcher();
         descriptionSearcher.setDescriptorExtractor(stringDescriptorExtractor);
         descriptionSearcher.setIndex(new BTreeIndex("descriptionSearcher", StringDescriptor.class));
-        descriptionSearcher.setQueryProcessor(new QueryProcessorParallelLinearImpl());
-//        descriptionSearcher.setQueryProcessor(new QueryProcessorDefaultImpl());
+//        descriptionSearcher.setQueryProcessor(new QueryProcessorParallelLinearImpl());
+        descriptionSearcher.setQueryProcessor(new QueryProcessorDefaultImpl());
 
         //A searcher for the image contentIndex (using only one type of descriptor
         NBTreeSearcher imageSearcher = new NBTreeSearcher();
@@ -102,8 +103,8 @@ public class DemoTest extends TestCase {
         imageSearcher.setDescriptorExtractor(new ColorLayoutDescriptor<IndexedObject>());
         //using a BTreeIndex
         imageSearcher.setIndex(new BTreeIndex("contentSearcher", ColorLayoutDescriptor.class));
-        imageSearcher.setQueryProcessor(new QueryProcessorParallelLinearImpl());
-//        imageSearcher.setQueryProcessor(new QueryProcessorDefaultImpl());
+//        imageSearcher.setQueryProcessor(new QueryProcessorParallelLinearImpl());
+        imageSearcher.setQueryProcessor(new QueryProcessorDefaultImpl());
 
         e.getQueryProcessor().setSearcher("filename", filenameSearcher);
         e.getQueryProcessor().setSearcher("description", descriptionSearcher);
@@ -270,13 +271,13 @@ public class DemoTest extends TestCase {
 
             timeBefore = Calendar.getInstance().getTimeInMillis();
 
-            ResultSetDefaultImp<ImageModel> results = e.search(query);
+            ResultSet<ImageModel> results = e.search(query);
 
             timeAfter = Calendar.getInstance().getTimeInMillis();
 
             System.out.println("Search took: " + (timeAfter - timeBefore));
 
-            System.out.println("Number of retrieved elements: " + results.size());
+            System.out.println("Number of retrieved elements: " + results.getSize());
             for (Result<ImageModel> r : results) {
                 System.out.print("Retrieved element: " + r.getResultObject().toString() + "\t");
                 System.out.println("Similarity: " + r.getScore());
