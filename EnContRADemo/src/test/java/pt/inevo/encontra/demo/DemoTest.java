@@ -1,5 +1,6 @@
 package pt.inevo.encontra.demo;
 
+import pt.inevo.encontra.common.Result;
 import akka.actor.ActorRef;
 import akka.actor.UntypedActor;
 import akka.actor.UntypedActorFactory;
@@ -269,7 +270,7 @@ public class DemoTest extends TestCase {
 
             timeBefore = Calendar.getInstance().getTimeInMillis();
 
-            ResultSet<ImageModel> results = e.search(query);
+            ResultSetDefaultImp<ImageModel> results = e.search(query);
 
             timeAfter = Calendar.getInstance().getTimeInMillis();
 
@@ -277,8 +278,8 @@ public class DemoTest extends TestCase {
 
             System.out.println("Number of retrieved elements: " + results.size());
             for (Result<ImageModel> r : results) {
-                System.out.print("Retrieved element: " + r.getResult().toString() + "\t");
-                System.out.println("Similarity: " + r.getSimilarity());
+                System.out.print("Retrieved element: " + r.getResultObject().toString() + "\t");
+                System.out.println("Similarity: " + r.getScore());
             }
         } catch (IOException ex) {
             System.out.println("[Error] Couldn't load the query image. Possible reason: " + ex.getMessage());
