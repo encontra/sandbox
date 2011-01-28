@@ -79,8 +79,8 @@ public class DemoTest extends TestCase {
         System.out.println("Creating the Retrieval Engine...");
         e = new SimpleEngine<ImageModel>();
         e.setObjectStorage(storage);
-//        e.setQueryProcessor(new QueryProcessorParallelLinearImpl());
-        e.setQueryProcessor(new QueryProcessorDefaultImpl());
+        e.setQueryProcessor(new QueryProcessorParallelLinearImpl());
+//        e.setQueryProcessor(new QueryProcessorDefaultImpl());
         e.getQueryProcessor().setIndexedObjectFactory(new SimpleIndexedObjectFactory());
 
         //A searcher for the filenameIndex
