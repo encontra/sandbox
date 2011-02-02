@@ -4,18 +4,21 @@ import pt.inevo.encontra.common.Result;
 import akka.actor.ActorRef;
 import akka.actor.UntypedActor;
 import akka.actor.UntypedActorFactory;
-import akka.dispatch.CompletableFuture;
 import akka.dispatch.Future;
+
 import javax.persistence.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.List;
 import java.util.Properties;
 import javax.imageio.ImageIO;
+
+import pt.inevo.encontra.common.SyncResultProvider;
+import pt.inevo.encontra.demo.loader.ImageModelLoader;
+import pt.inevo.encontra.demo.loader.ImageLoaderActor;
+import pt.inevo.encontra.demo.loader.Message;
 import pt.inevo.encontra.descriptors.DescriptorExtractor;
 import pt.inevo.encontra.engine.SimpleEngine;
 import junit.framework.TestCase;
@@ -27,6 +30,7 @@ import pt.inevo.encontra.index.*;
 import pt.inevo.encontra.index.search.SimpleSearcher;
 import pt.inevo.encontra.nbtree.index.BTreeIndex;
 import pt.inevo.encontra.nbtree.index.NBTreeSearcher;
+import pt.inevo.encontra.nbtree.index.ParallelNBTreeSearcher;
 import pt.inevo.encontra.query.*;
 import pt.inevo.encontra.query.criteria.CriteriaBuilderImpl;
 import pt.inevo.encontra.storage.*;
@@ -36,6 +40,7 @@ import scala.Option;
  * Demo of the EnContRA Framework API.
  * Loading a sample database and extracting simple descriptors from it, and then
  * perform a similarity query.
+ *
  * @author ricardo
  */
 public class DemoTest extends TestCase {
@@ -64,7 +69,7 @@ public class DemoTest extends TestCase {
         }
     }
 
-    //initilizes all the structures needed for EnContRA to work
+    //initializes all the structures needed for EnContRA to work
     private void initEngine() {
         //Creating the EntityStorage for saving the objects
         ImageModelStorage storage = new ImageModelStorage();
@@ -79,32 +84,33 @@ public class DemoTest extends TestCase {
         System.out.println("Creating the Retrieval Engine...");
         e = new SimpleEngine<ImageModel>();
         e.setObjectStorage(storage);
-        e.setQueryProcessor(new QueryProcessorParallelLinearImpl());
-//        e.setQueryProcessor(new QueryProcessorDefaultImpl());
+//        e.setQueryProcessor(new QueryProcessorDefaultParallelImpl());
+        e.setQueryProcessor(new QueryProcessorDefaultImpl());
         e.getQueryProcessor().setIndexedObjectFactory(new SimpleIndexedObjectFactory());
+        e.setResultProvider(new SyncResultProvider());
 
         //A searcher for the filenameIndex
         SimpleSearcher filenameSearcher = new SimpleSearcher();
         filenameSearcher.setDescriptorExtractor(stringDescriptorExtractor);
         filenameSearcher.setIndex(new BTreeIndex("filenameSearcher", StringDescriptor.class));
-//        filenameSearcher.setQueryProcessor(new QueryProcessorParallelLinearImpl());
-        filenameSearcher.setQueryProcessor(new QueryProcessorDefaultImpl());
+        filenameSearcher.setResultProvider(new SyncResultProvider());
 
         //A searcher for the descriptionIndex
         SimpleSearcher descriptionSearcher = new SimpleSearcher();
         descriptionSearcher.setDescriptorExtractor(stringDescriptorExtractor);
         descriptionSearcher.setIndex(new BTreeIndex("descriptionSearcher", StringDescriptor.class));
-//        descriptionSearcher.setQueryProcessor(new QueryProcessorParallelLinearImpl());
-        descriptionSearcher.setQueryProcessor(new QueryProcessorDefaultImpl());
+        descriptionSearcher.setResultProvider(new SyncResultProvider());
 
         //A searcher for the image contentIndex (using only one type of descriptor
-        NBTreeSearcher imageSearcher = new NBTreeSearcher();
+//        NBTreeSearcher imageSearcher = new NBTreeSearcher();
+        ParallelNBTreeSearcher imageSearcher = new ParallelNBTreeSearcher();
         //using a single descriptor
         imageSearcher.setDescriptorExtractor(new ColorLayoutDescriptor<IndexedObject>());
         //using a BTreeIndex
         imageSearcher.setIndex(new BTreeIndex("contentSearcher", ColorLayoutDescriptor.class));
-//        imageSearcher.setQueryProcessor(new QueryProcessorParallelLinearImpl());
+//        imageSearcher.setQueryProcessor(new QueryProcessorDefaultParallelImpl());
         imageSearcher.setQueryProcessor(new QueryProcessorDefaultImpl());
+        imageSearcher.setResultProvider(new SyncResultProvider());
 
         e.getQueryProcessor().setSearcher("filename", filenameSearcher);
         e.getQueryProcessor().setSearcher("description", descriptionSearcher);
@@ -127,100 +133,12 @@ public class DemoTest extends TestCase {
         super.tearDown();
     }
 
-    public class ImageModelStorage extends JPAObjectStorage<Long, ImageModel> {}
-
-    //message passed between the loader actors
-    class Message {
-        public String operation;
-        public Object obj;
+    public class ImageModelStorage extends JPAObjectStorage<Long, ImageModel> {
     }
 
-    class ImageLoaderActor extends UntypedActor {
-
-        protected ImageModelLoader loader;
-        protected  ArrayList<ActorRef> producers;
-        protected CompletableFuture future;
-        protected List<Result> results;
-
-        ImageLoaderActor() {
-            producers = new ArrayList<ActorRef>();
-        }
-
-        ImageLoaderActor(ImageModelLoader loader) {
-            this();
-            this.loader = loader;
-        }
-
-        @Override
-        public void onReceive(Object o) throws Exception {
-            if (o instanceof Message) {
-                Message message = (Message) o;
-                if (message.operation.equals("PROCESSALL")) {
-                    loader = (ImageModelLoader) message.obj;
-
-                    for (int i = 0; i < 10; i++) {
-                        ActorRef actor = UntypedActor.actorOf(new UntypedActorFactory() {
-
-                            @Override
-                            public UntypedActor create() {
-                                return new ImageLoaderActor(loader);
-                            }
-                        }).start();
-                        producers.add(actor);
-                    }
-
-                    if (getContext().getSenderFuture().isDefined()) {
-                        future = (CompletableFuture) getContext().getSenderFuture().get();
-                    }
-
-                    for (ActorRef producer : producers) {
-                        if (loader.hasNext()) {
-                            Message m = new Message();
-                            m.operation = "PROCESSONE";
-                            m.obj = loader.next(); //set here the real object
-                            producer.sendOneWay(m, getContext());
-                        }
-                    }
-
-                } else if (message.operation.equals("PROCESSONE")) {
-                    File f = (File)message.obj;
-                    ImageModel model = loader.loadImage(f);
-                    
-                    Message answer = new Message();
-                    answer.operation = "ANSWER";
-                    answer.obj = model;
-                    getContext().replySafe(answer);
-                } else if (message.operation.equals("ANSWER")) {
-                    ImageModel model = (ImageModel)message.obj;
-                    if (model != null) {    //save the object
-                        e.insert(model);
-                        model.getImage().flush();
-                        model.getImage().getGraphics().dispose();
-                    }
-
-                    if (loader.hasNext()) {
-                        Message m = new Message();
-                        m.operation = "PROCESSONE";
-                        m.obj = loader.next(); //set here the real object
-                        getContext().sendOneWay(m, getContext());
-                    } else {
-                        Runtime r = Runtime.getRuntime();
-                        long freeMem = r.freeMemory();
-                        System.out.println("Free memory was: " + freeMem);
-
-                        if (future != null) {
-                            future.completeWithResult(true);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    //EnContRA Demo Test
-    public void testDemo() {
+    private void load() {
         long timeBefore = 0, timeAfter = 0;
-
+        //load and index the files only once
         File f = new File("contentSearcher.db");
         if (!f.exists()) {
             System.out.println("Loading some objects to the test indexes...");
@@ -230,7 +148,7 @@ public class DemoTest extends TestCase {
             ActorRef loaderActor = UntypedActor.actorOf(new UntypedActorFactory() {
                 @Override
                 public UntypedActor create() {
-                    return new ImageLoaderActor();
+                    return new ImageLoaderActor(e);
                 }
             }).start();
 
@@ -255,6 +173,14 @@ public class DemoTest extends TestCase {
             timeAfter = Calendar.getInstance().getTimeInMillis();
             System.out.println("Insertion/load took: " + (timeAfter - timeBefore));
         }
+    }
+
+    //EnContRA Demo Test
+    public void testDemo() {
+        long timeBefore = 0, timeAfter = 0;
+
+        //load only if necessary
+        load();
 
         try {
             System.out.println("Creating a knn query...");
@@ -266,8 +192,8 @@ public class DemoTest extends TestCase {
             Path imagePath = query.from(ImageModel.class).get("image");
             query = query.where(
                     cb.and(
-                        cb.similar(imagePath, image),
-                        cb.similar(imagePath, image2))).distinct(true);
+                            cb.similar(imagePath, image),
+                            cb.similar(imagePath, image2))).distinct(true).limit(20);
 
             timeBefore = Calendar.getInstance().getTimeInMillis();
 

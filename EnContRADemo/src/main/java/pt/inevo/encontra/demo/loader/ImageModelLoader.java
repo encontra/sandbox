@@ -1,4 +1,4 @@
-package pt.inevo.encontra.demo;
+package pt.inevo.encontra.demo.loader;
 
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
@@ -11,6 +11,7 @@ import java.util.List;
 import javax.imageio.ImageIO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import pt.inevo.encontra.demo.ImageModel;
 import pt.inevo.encontra.demo.utils.FileUtil;
 
 /**
