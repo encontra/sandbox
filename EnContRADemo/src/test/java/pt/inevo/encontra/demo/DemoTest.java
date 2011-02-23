@@ -1,5 +1,6 @@
 package pt.inevo.encontra.demo;
 
+import pt.inevo.encontra.common.DefaultResultProvider;
 import pt.inevo.encontra.common.Result;
 import akka.actor.ActorRef;
 import akka.actor.UntypedActor;
@@ -15,7 +16,6 @@ import java.util.Calendar;
 import java.util.Properties;
 import javax.imageio.ImageIO;
 
-import pt.inevo.encontra.common.SyncResultProvider;
 import pt.inevo.encontra.demo.loader.ImageModelLoader;
 import pt.inevo.encontra.demo.loader.ImageLoaderActor;
 import pt.inevo.encontra.demo.loader.Message;
@@ -27,6 +27,7 @@ import pt.inevo.encontra.descriptors.SimpleDescriptorExtractor;
 import pt.inevo.encontra.engine.SimpleIndexedObjectFactory;
 import pt.inevo.encontra.image.descriptors.ColorLayoutDescriptor;
 import pt.inevo.encontra.index.*;
+import pt.inevo.encontra.index.search.ParallelSimpleSearcher;
 import pt.inevo.encontra.index.search.SimpleSearcher;
 import pt.inevo.encontra.nbtree.index.BTreeIndex;
 import pt.inevo.encontra.nbtree.index.NBTreeSearcher;
@@ -41,7 +42,7 @@ import scala.Option;
  * Loading a sample database and extracting simple descriptors from it, and then
  * perform a similarity query.
  *
- * @author ricardo
+ * @author Ricardo
  */
 public class DemoTest extends TestCase {
 
@@ -84,33 +85,30 @@ public class DemoTest extends TestCase {
         System.out.println("Creating the Retrieval Engine...");
         e = new SimpleEngine<ImageModel>();
         e.setObjectStorage(storage);
-//        e.setQueryProcessor(new QueryProcessorDefaultParallelImpl());
-        e.setQueryProcessor(new QueryProcessorDefaultImpl());
+        e.setQueryProcessor(new QueryProcessorDefaultParallelImpl());
         e.getQueryProcessor().setIndexedObjectFactory(new SimpleIndexedObjectFactory());
-        e.setResultProvider(new SyncResultProvider());
+        e.setResultProvider(new DefaultResultProvider());
 
         //A searcher for the filenameIndex
-        SimpleSearcher filenameSearcher = new SimpleSearcher();
+        ParallelSimpleSearcher filenameSearcher = new ParallelSimpleSearcher();
         filenameSearcher.setDescriptorExtractor(stringDescriptorExtractor);
         filenameSearcher.setIndex(new BTreeIndex("filenameSearcher", StringDescriptor.class));
-        filenameSearcher.setResultProvider(new SyncResultProvider());
+        filenameSearcher.setResultProvider(new DefaultResultProvider());
 
         //A searcher for the descriptionIndex
-        SimpleSearcher descriptionSearcher = new SimpleSearcher();
+        ParallelSimpleSearcher descriptionSearcher = new ParallelSimpleSearcher();
         descriptionSearcher.setDescriptorExtractor(stringDescriptorExtractor);
         descriptionSearcher.setIndex(new BTreeIndex("descriptionSearcher", StringDescriptor.class));
-        descriptionSearcher.setResultProvider(new SyncResultProvider());
+        descriptionSearcher.setResultProvider(new DefaultResultProvider());
 
         //A searcher for the image contentIndex (using only one type of descriptor
-//        NBTreeSearcher imageSearcher = new NBTreeSearcher();
         ParallelNBTreeSearcher imageSearcher = new ParallelNBTreeSearcher();
         //using a single descriptor
         imageSearcher.setDescriptorExtractor(new ColorLayoutDescriptor<IndexedObject>());
         //using a BTreeIndex
         imageSearcher.setIndex(new BTreeIndex("contentSearcher", ColorLayoutDescriptor.class));
-//        imageSearcher.setQueryProcessor(new QueryProcessorDefaultParallelImpl());
-        imageSearcher.setQueryProcessor(new QueryProcessorDefaultImpl());
-        imageSearcher.setResultProvider(new SyncResultProvider());
+        imageSearcher.setQueryProcessor(new QueryProcessorDefaultParallelImpl());
+        imageSearcher.setResultProvider(new DefaultResultProvider());
 
         e.getQueryProcessor().setSearcher("filename", filenameSearcher);
         e.getQueryProcessor().setSearcher("description", descriptionSearcher);
@@ -179,7 +177,6 @@ public class DemoTest extends TestCase {
     public void testDemo() {
         long timeBefore = 0, timeAfter = 0;
 
-        //load only if necessary
         load();
 
         try {
@@ -190,12 +187,13 @@ public class DemoTest extends TestCase {
             CriteriaBuilderImpl cb = new CriteriaBuilderImpl();
             CriteriaQuery<ImageModel> query = cb.createQuery(ImageModel.class);
             Path imagePath = query.from(ImageModel.class).get("image");
+
+            timeBefore = Calendar.getInstance().getTimeInMillis();
+
             query = query.where(
                     cb.and(
                             cb.similar(imagePath, image),
-                            cb.similar(imagePath, image2))).distinct(true).limit(20);
-
-            timeBefore = Calendar.getInstance().getTimeInMillis();
+                            cb.similar(imagePath, image2))).distinct(true).limit(100);
 
             ResultSet<ImageModel> results = e.search(query);
 
