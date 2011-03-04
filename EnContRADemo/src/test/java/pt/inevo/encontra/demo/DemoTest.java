@@ -28,12 +28,11 @@ import pt.inevo.encontra.engine.SimpleIndexedObjectFactory;
 import pt.inevo.encontra.image.descriptors.ColorLayoutDescriptor;
 import pt.inevo.encontra.index.*;
 import pt.inevo.encontra.index.search.ParallelSimpleSearcher;
-import pt.inevo.encontra.index.search.SimpleSearcher;
 import pt.inevo.encontra.nbtree.index.BTreeIndex;
-import pt.inevo.encontra.nbtree.index.NBTreeSearcher;
 import pt.inevo.encontra.nbtree.index.ParallelNBTreeSearcher;
 import pt.inevo.encontra.query.*;
 import pt.inevo.encontra.query.criteria.CriteriaBuilderImpl;
+import pt.inevo.encontra.query.criteria.StorageCriteria;
 import pt.inevo.encontra.storage.*;
 import scala.Option;
 
@@ -87,6 +86,7 @@ public class DemoTest extends TestCase {
         e.setObjectStorage(storage);
         e.setQueryProcessor(new QueryProcessorDefaultParallelImpl());
         e.getQueryProcessor().setIndexedObjectFactory(new SimpleIndexedObjectFactory());
+        e.getQueryProcessor().setTopSearcher(e);
         e.setResultProvider(new DefaultResultProvider());
 
         //A searcher for the filenameIndex
@@ -187,6 +187,7 @@ public class DemoTest extends TestCase {
             CriteriaBuilderImpl cb = new CriteriaBuilderImpl();
             CriteriaQuery<ImageModel> query = cb.createQuery(ImageModel.class);
             Path imagePath = query.from(ImageModel.class).get("image");
+            String storageCriteria = "category like '%trees%'";
 
             timeBefore = Calendar.getInstance().getTimeInMillis();
 
@@ -194,6 +195,8 @@ public class DemoTest extends TestCase {
                     cb.and(
                             cb.similar(imagePath, image),
                             cb.similar(imagePath, image2))).distinct(true).limit(100);
+
+            query.setCriteria(new StorageCriteria(storageCriteria));
 
             ResultSet<ImageModel> results = e.search(query);
 

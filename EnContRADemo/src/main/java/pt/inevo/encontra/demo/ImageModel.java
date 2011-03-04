@@ -21,6 +21,8 @@ public class ImageModel implements IEntity<Long> {
     @Transient
     private BufferedImage image;
 
+    private String category;
+
     public ImageModel() {
     }
 
@@ -67,12 +69,22 @@ public class ImageModel implements IEntity<Long> {
         this.image = image;
     }
 
+    //@Indexed - we don't need to index this
+    public String getCategory(){
+        return this.category;
+    }
+
+    public void setCategory(String category){
+        this.category = category;
+    }
+
     @Override
     public String toString() {
         return "TestModel{"
                 + "id=" + id
-                + ", title='" + filename + '\''
+                + ", filename='" + filename + '\''
                 + ", content='" + description + '\''
+                + ", category='" + category + '\''
                 + '}';
     }
 }

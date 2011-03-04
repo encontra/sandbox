@@ -17,7 +17,6 @@ public class ImageLoaderActor extends UntypedActor {
     protected ImageModelLoader loader;
     protected ArrayList<ActorRef> producers;
     protected CompletableFuture future;
-    protected List<Result> results;
     protected Searcher e;
 
     public ImageLoaderActor() {
@@ -79,13 +78,14 @@ public class ImageLoaderActor extends UntypedActor {
                     e.insert(model);
                     model.getImage().flush();
                     model.getImage().getGraphics().dispose();
+                    model.setImage(null);
                 }
 
                 if (loader.hasNext()) {
                     Message m = new Message();
                     m.operation = "PROCESSONE";
                     m.obj = loader.next(); //set here the real object
-                    getContext().sendOneWay(m, getContext());
+                    getContext().getSender().get().sendOneWay(m, getContext());
                 } else {
                     Runtime r = Runtime.getRuntime();
                     long freeMem = r.freeMemory();

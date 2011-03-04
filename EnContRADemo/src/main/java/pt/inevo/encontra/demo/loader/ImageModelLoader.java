@@ -1,5 +1,11 @@
 package pt.inevo.encontra.demo.loader;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import pt.inevo.encontra.demo.ImageModel;
+import pt.inevo.encontra.demo.utils.FileUtil;
+
+import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.File;
@@ -8,11 +14,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import javax.imageio.ImageIO;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import pt.inevo.encontra.demo.ImageModel;
-import pt.inevo.encontra.demo.utils.FileUtil;
 
 /**
  * Loader for Objects of the type: ImageModel.
@@ -43,8 +44,9 @@ public class ImageModelLoader {
         im.setId(idCount++);
 
         //get the description
-        String name = image.getName();
+        String name = image.getParentFile().getName() + "/" + image.getName();
         im.setDescription(annotations.get(name));
+        im.setCategory(im.getDescription());
 
         //get the bufferedimage
         try {
@@ -75,7 +77,8 @@ public class ImageModelLoader {
                 while ((line = reader.readLine()) != null) {
                     String[] parts = line.split(" ");
                     String[] name = parts[0].split("/");
-                    annotations.put(name[1] + ".jpg", line);
+//                    annotations.put(name[1] + ".jpg", line);
+                    annotations.put(parts[0] + ".jpg", line);
                 }
             }
         } catch (IOException ex) {
