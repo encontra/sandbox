@@ -1,39 +1,41 @@
 package pt.inevo.encontra.demo;
 
-import pt.inevo.encontra.common.DefaultResultProvider;
-import pt.inevo.encontra.common.Result;
 import akka.actor.ActorRef;
 import akka.actor.UntypedActor;
 import akka.actor.UntypedActorFactory;
 import akka.dispatch.Future;
+import junit.framework.TestCase;
+import pt.inevo.encontra.common.DefaultResultProvider;
+import pt.inevo.encontra.common.Result;
+import pt.inevo.encontra.common.ResultSet;
+import pt.inevo.encontra.demo.loader.*;
+import pt.inevo.encontra.descriptors.DescriptorExtractor;
+import pt.inevo.encontra.descriptors.SimpleDescriptorExtractor;
+import pt.inevo.encontra.engine.SimpleEngine;
+import pt.inevo.encontra.engine.SimpleIndexedObjectFactory;
+import pt.inevo.encontra.image.descriptors.ColorLayoutDescriptor;
+import pt.inevo.encontra.index.IndexedObject;
+import pt.inevo.encontra.index.search.ParallelSimpleSearcher;
+import pt.inevo.encontra.nbtree.index.BTreeIndex;
+import pt.inevo.encontra.nbtree.index.ParallelNBTreeSearcher;
+import pt.inevo.encontra.query.CriteriaQuery;
+import pt.inevo.encontra.query.Path;
+import pt.inevo.encontra.query.QueryProcessorDefaultParallelImpl;
+import pt.inevo.encontra.query.criteria.CriteriaBuilderImpl;
+import pt.inevo.encontra.query.criteria.StorageCriteria;
+import pt.inevo.encontra.storage.CMISObjectStorage;
+import pt.inevo.encontra.storage.JPAObjectStorage;
+import scala.Option;
 
-import javax.persistence.*;
+import javax.imageio.ImageIO;
+import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.Persistence;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.*;
-import javax.imageio.ImageIO;
-
-import pt.inevo.encontra.demo.loader.ImageModelLoader;
-import pt.inevo.encontra.demo.loader.ImageLoaderActor;
-import pt.inevo.encontra.demo.loader.Message;
-import pt.inevo.encontra.descriptors.DescriptorExtractor;
-import pt.inevo.encontra.engine.SimpleEngine;
-import junit.framework.TestCase;
-import pt.inevo.encontra.common.ResultSet;
-import pt.inevo.encontra.descriptors.SimpleDescriptorExtractor;
-import pt.inevo.encontra.engine.SimpleIndexedObjectFactory;
-import pt.inevo.encontra.image.descriptors.ColorLayoutDescriptor;
-import pt.inevo.encontra.index.*;
-import pt.inevo.encontra.index.search.ParallelSimpleSearcher;
-import pt.inevo.encontra.nbtree.index.BTreeIndex;
-import pt.inevo.encontra.nbtree.index.ParallelNBTreeSearcher;
-import pt.inevo.encontra.query.*;
-import pt.inevo.encontra.query.criteria.CriteriaBuilderImpl;
-import pt.inevo.encontra.query.criteria.StorageCriteria;
-import pt.inevo.encontra.storage.*;
-import scala.Option;
 
 /**
  * Demo of the EnContRA Framework API.
@@ -42,19 +44,26 @@ import scala.Option;
  *
  * @author Ricardo
  */
-public class DemoTest extends TestCase {
+public class CmisDemoTest extends TestCase {
 
     /*
      * Internal properties
      */
-    protected EntityManagerFactory emf;
-    protected EntityManager em;
     protected SimpleEngine<ImageModel> e;
     protected Properties props;
     protected String DATABASE_FOLDER = "";
     protected String QUERY_IMAGE_PATH = "";
     protected String QUERY_IMAGE_PATH2 = "";
     protected Map<String, String> parameter;
+
+    private CMISObjectStorage<CmisImageModel> storage;
+
+    public class CmisImageModelStorage extends CMISObjectStorage<CmisImageModel> {
+
+        CmisImageModelStorage(Map<String, String> parameters) {
+            super(parameters);
+        }
+    }
 
     //load properties file
     private void loadProperties() {
@@ -64,20 +73,24 @@ public class DemoTest extends TestCase {
             DATABASE_FOLDER = props.getProperty("database_folder");
             QUERY_IMAGE_PATH = props.getProperty("query_image_path");
             QUERY_IMAGE_PATH2 = props.getProperty("query_image_path2");
+
+            Properties properties = new Properties();
+            properties.load(new FileInputStream("src/test/resources/cmis_config.properties"));
+            parameter = new HashMap<String, String>();
+            Enumeration e = properties.propertyNames();
+            while (e.hasMoreElements()) {
+                String propertyName = e.nextElement().toString();
+                parameter.put(propertyName, properties.getProperty(propertyName));
+            }
         } catch (IOException ex) {
             System.out.println("Error, couldn't load the properties file.\nMessage:" + ex.getMessage());
         }
-
-
     }
 
     //initializes all the structures needed for EnContRA to work
     private void initEngine() {
         //Creating the EntityStorage for saving the objects
-        ImageModelStorage storage = new ImageModelStorage();
-        emf = Persistence.createEntityManagerFactory("manager");
-        em = emf.createEntityManager();
-        storage.setEntityManager(em);
+        CmisImageModelStorage storage = new CmisImageModelStorage(parameter);
 
         //Creating the descriptor extractor for strings
         DescriptorExtractor stringDescriptorExtractor = new SimpleDescriptorExtractor(StringDescriptor.class);
@@ -117,7 +130,7 @@ public class DemoTest extends TestCase {
         e.getQueryProcessor().setSearcher("image", imageSearcher);
     }
 
-    public DemoTest(String testName) {
+    public CmisDemoTest(String testName) {
         super(testName);
         loadProperties();
         initEngine();
@@ -133,22 +146,19 @@ public class DemoTest extends TestCase {
         super.tearDown();
     }
 
-    public class ImageModelStorage extends JPAObjectStorage<Long, ImageModel> {
-    }
-
     private void load() {
         long timeBefore = 0, timeAfter = 0;
         //load and index the files only once
         File f = new File("contentSearcher.db");
         if (!f.exists()) {
             System.out.println("Loading some objects to the test indexes...");
-            ImageModelLoader loader = new ImageModelLoader(DATABASE_FOLDER);
+            CmisImageModelLoader loader = new CmisImageModelLoader(DATABASE_FOLDER);
             loader.scan();
 
             ActorRef loaderActor = UntypedActor.actorOf(new UntypedActorFactory() {
                 @Override
                 public UntypedActor create() {
-                    return new ImageLoaderActor(e);
+                    return new CmisImageLoaderActor(e);
                 }
             }).start();
 
@@ -189,7 +199,7 @@ public class DemoTest extends TestCase {
             CriteriaBuilderImpl cb = new CriteriaBuilderImpl();
             CriteriaQuery<ImageModel> query = cb.createQuery(ImageModel.class);
             Path imagePath = query.from(ImageModel.class).get("image");
-            String storageCriteria = "category like '%trees%'";
+            String storageCriteria = "cmis:contentStreamFileName like '%Washington%'";
 
             timeBefore = Calendar.getInstance().getTimeInMillis();
 
@@ -200,14 +210,14 @@ public class DemoTest extends TestCase {
 
             query.setCriteria(new StorageCriteria(storageCriteria));
 
-            ResultSet<ImageModel> results = e.search(query);
+            ResultSet<CmisImageModel> results = e.search(query);
 
             timeAfter = Calendar.getInstance().getTimeInMillis();
 
             System.out.println("Search took: " + (timeAfter - timeBefore));
 
             System.out.println("Number of retrieved elements: " + results.getSize());
-            for (Result<ImageModel> r : results) {
+            for (Result<CmisImageModel> r : results) {
                 System.out.print("Retrieved element: " + r.getResultObject().toString() + "\t");
                 System.out.println("Similarity: " + r.getScore());
             }
