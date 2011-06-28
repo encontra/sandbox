@@ -7,6 +7,7 @@ import pt.inevo.encontra.storage.IEntity;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.Transient;
 
 @Entity
 public class SampleDrawing implements IEntity<Long>{
@@ -15,10 +16,20 @@ public class SampleDrawing implements IEntity<Long>{
     @GeneratedValue
     private Long id;
 
+    @Transient
     private Drawing drawing;
-    private DrawingCategory category;
+
+    private String category;
     private String description;
-    
+
+    public String getSVG(){
+        return drawing.getSVG();
+    }
+
+    public void setSVG(String svg){
+        drawing=new Drawing();
+        drawing.createFromSVG(svg);
+    }
     @Override
     public Long getId() {
         return id;
@@ -39,7 +50,7 @@ public class SampleDrawing implements IEntity<Long>{
        return description;
     }
 
-    public DrawingCategory getCategory() {
+    public String getCategory() {
        return category; 
     }
 
@@ -47,7 +58,7 @@ public class SampleDrawing implements IEntity<Long>{
         this.drawing = drawing;
     }
 
-    public void setCategory(DrawingCategory category) {
+    public void setCategory(String category) {
         this.category = category;
     }
 
