@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>pt.inevo.encontra</groupId>
+    <artifactId>js-descriptor</artifactId>
+    <packaging>war</packaging>
+    <version>1.0-SNAPSHOT</version>
+    <name>pt.inevo.encontra.JSDescriptor</name>
+
+    <properties>
+        <!-- Convenience property to set the GWT version -->
+        <gwt.version>2.4.0</gwt.version>
+        <gwt.style>PRETTY</gwt.style>
+
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
+    <repositories>
+        <repository>
+            <id>vectomatic</id>
+            <url>http://www.vectomatic.org/mvn/</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <!-- Google Web Toolkit (GWT) -->
+
+        <dependency>
+            <groupId>com.google.gwt</groupId>
+            <artifactId>gwt-user</artifactId>
+            <version>${gwt.version}</version>
+            <!-- "provided" so that we don't deploy -->
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.vectomatic</groupId>
+            <artifactId>lib-gwt-file</artifactId>
+            <version>0.2</version>
+        </dependency>
+
+        <dependency>
+            <groupId>net.semanticmetadata</groupId>
+            <artifactId>lire-imageanalysis</artifactId>
+            <version>0.8</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.gwt</groupId>
+            <artifactId>gwt-servlet</artifactId>
+            <version>${gwt.version}</version>
+            <scope>war</scope>
+        </dependency>
+        <!--dependency>
+            <groupId>net.semanticmetadata</groupId>
+            <artifactId>lire-imageanalysis</artifactId>
+            <version>0.8</version>
+            <classifier>sources</classifier>
+        </dependency-->
+    </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/java</directory>
+                <includes>
+                    <include>**/jre/**/*.java</include>
+                    <include>**/client/**/*.java</include>
+                    <include>**/*.gwt.xml</include>
+                    <include>**/*.properties</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+        </resources>
+
+        <plugins>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.6</source>
+                    <target>1.6</target>
+                    <excludes>
+                        <exclude>**/client/**/*.java</exclude>
+                        <exclude>**/jre/**/*.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+            <!-- GWT Maven Plugin-->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>gwt-maven-plugin</artifactId>
+                <version>2.4.0</version>
+                <configuration>
+                    <extraJvmArgs>
+                        -Djava.protocol.handler.pkgs=pt.inevo.encontra.protocol
+                    </extraJvmArgs>
+
+                    <compileSourcesArtifacts>
+                        <compileSourcesArtifact>net.semanticmetadata:lire-imageanalysis</compileSourcesArtifact>
+                    </compileSourcesArtifacts>
+                    <!-- URL that should be automatically opened in the GWT shell (gwt:run). -->
+                    <runTarget>JSDescriptor.html</runTarget>
+                    <!-- Ask GWT to create the Story of Your Compile (SOYC) (gwt:compile) -->
+                    <compileReport>true</compileReport>
+                    <modules>
+                        <module>pt.inevo.encontra.JSDescriptor</module>
+                    </modules>
+
+                    <logLevel>INFO</logLevel>
+                    <strict>true</strict>
+                    <style>${gwt.style}</style>
+                    <copyWebapp>true</copyWebapp>
+                </configuration>
+            </plugin>
+
+
+            <!-- Copy static web files before executing gwt:run -->
+            <plugin>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>2.4.2</version>
+                <executions>
+                    <execution>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/${project.build.finalName}</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>src/main/webapp</directory>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>2.1.1</version>
+            </plugin>
+            <plugin>
+                <groupId>org.mortbay.jetty</groupId>
+                <artifactId>jetty-maven-plugin</artifactId>
+            </plugin>
+            <!-- Mark the project for Google Plugin for Eclipse (GPE) -->
+            <plugin>
+                <artifactId>maven-eclipse-plugin</artifactId>
+                <version>2.8</version>
+                <configuration>
+                    <downloadSources>true</downloadSources>
+                    <downloadJavadocs>false</downloadJavadocs>
+                    <wtpversion>2.0</wtpversion>
+                    <additionalBuildcommands>
+                        <buildCommand>
+                            <name>com.google.gwt.eclipse.core.gwtProjectValidator</name>
+                        </buildCommand>
+                    </additionalBuildcommands>
+                    <additionalProjectnatures>
+                        <projectnature>com.google.gwt.eclipse.core.gwtNature</projectnature>
+                    </additionalProjectnatures>
+                </configuration>
+            </plugin>
+        </plugins>
+
+    </build>
+</project>
